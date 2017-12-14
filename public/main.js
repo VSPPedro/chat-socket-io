@@ -23,14 +23,15 @@ $(function() {
   var lastTypingTime;
   var $currentInput = $usernameInput.focus();
 
-  var socket = io();
+  //var socket = io(); // TIP: io() with no args does auto-discovery
+  var socket = io({transports: ['websocket'], upgrade: false});
 
   function addParticipantsMessage (data) {
     var message = '';
     if (data.numUsers === 1) {
-      message += "there's 1 participant";
+      message += "Apenas um usuário na sala";
     } else {
-      message += "there are " + data.numUsers + " participants";
+      message += data.numUsers + " participantes na sala";
     }
     log(message);
   }
@@ -56,15 +57,32 @@ $(function() {
     var message = $inputMessage.val();
     // Prevent markup from being injected into the message
     message = cleanInput(message);
+    
     // if there is a non-empty message and a socket connection
     if (message && connected) {
       $inputMessage.val('');
-      addChatMessage({
-        username: username,
-        message: message
-      });
-      // tell server to execute 'new message' and send along one parameter
-      socket.emit('new message', message);
+      
+      // Exceção: comando Bye
+      if (/^bye$/.test(message)) {
+          window.location.reload(); //Refresh na aba
+         //window.close(); // Para fechar a aba
+      } else if (/^send -all \w+/.test(message)) {
+        // Enviando a mensagem para todos os sockets
+        socket.emit('new message', message);
+      } else if (/^send -user \w+ \w+/.test(message)) {
+        // Removendo o comando da mensagem
+        message = message.replace('send -all ', '');
+        // Enviando a mensagem para todos os sockets
+        socket.emit('new private message', message);
+      } else if (/^list$/.test(message)) {
+        // Enviando a mensagem para todos os sockets
+        socket.emit('list');
+      } else if (/^rename \w+/.test(message)) {
+        // Enviando a mensagem para todos os sockets
+        socket.emit('rename', message);
+      } else {
+        socket.emit('unknown command', message);
+      }
     }
   }
 
@@ -85,7 +103,7 @@ $(function() {
     }
 
     var $usernameDiv = $('<span class="username"/>')
-      .text(data.username)
+      .text(data.username + ":")
       .css('color', getUsernameColor(data.username));
     var $messageBodyDiv = $('<span class="messageBody">')
       .text(data.message);
@@ -102,7 +120,7 @@ $(function() {
   // Adds the visual chat typing message
   function addChatTyping (data) {
     data.typing = true;
-    data.message = 'is typing';
+    data.message = 'está digitando';
     addChatMessage(data);
   }
 
@@ -189,7 +207,7 @@ $(function() {
   }
 
   // Keyboard events
-
+  
   $window.keydown(function (event) {
     // Auto-focus the current input when a key is typed
     if (!(event.ctrlKey || event.metaKey || event.altKey)) {
@@ -229,7 +247,7 @@ $(function() {
   socket.on('login', function (data) {
     connected = true;
     // Display the welcome message
-    var message = "Welcome to Socket.IO Chat – ";
+    var message = "Seja bem-vindo ao Socket IO Chat";
     log(message, {
       prepend: true
     });
@@ -240,16 +258,23 @@ $(function() {
   socket.on('new message', function (data) {
     addChatMessage(data);
   });
+  
+  // Whenever the server emits 'user joined', log it in the chat body
+  socket.on('success rename', function (data) {
+    var mensagem = 'O usuário \"' + data.oldName + '\" mudou o seu apelido para \"' + data.newName +"\"";
+    log(mensagem);
+    removeChatTyping(mensagem);
+  });
 
   // Whenever the server emits 'user joined', log it in the chat body
   socket.on('user joined', function (data) {
-    log(data.username + ' joined');
+    log(data.username + ' entrou na sala');
     addParticipantsMessage(data);
   });
 
   // Whenever the server emits 'user left', log it in the chat body
   socket.on('user left', function (data) {
-    log(data.username + ' left');
+    log(data.username + ' saiu da sala');
     addParticipantsMessage(data);
     removeChatTyping(data);
   });

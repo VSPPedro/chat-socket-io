@@ -8,10 +8,6 @@
 
 ### [NodeJS Architecture](https://www.journaldev.com/7462/node-js-architecture-single-threaded-event-loop)
 
-#### [OBS: xhr-polling]
-
-#### NodeJS é Singlethread
-
-#### WebSocket And Socket.IO
+#### OBS: NodeJS é Singlethread
 
 
